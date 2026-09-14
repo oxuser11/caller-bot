@@ -9,7 +9,7 @@ def home(): return "OX BOT 24/7 LIVE"
 def run_web():
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
 
-BOT_TOKEN = "8900604597:AAGN6rmhnOHkoPiJsrwPzUezcxVveDcLgN0"
+BOT_TOKEN = "8900604597:AAFm0a4tqdMRTpqYOiNEBWSCVNvnCP_GRHU"
 API_KEY = "cybershr1k_6772fb6a04705e3268"
 API_URL = "https://api-hub-alpha.vercel.app/api/number-info"
 TG_CHANNEL_LINK = "https://t.me/+852hkOgj0UNlZGU9"
@@ -269,4 +269,4 @@ def callbacks(c):
 if __name__ == '__main__':
     threading.Thread(target=run_web).start()
     bot.infinity_polling()
-        
+    
