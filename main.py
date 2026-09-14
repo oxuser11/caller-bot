@@ -45,6 +45,21 @@ def is_joined(uid):
         return m.status in ['member', 'administrator', 'creator']
     except: return False
 
+def find_deep(obj, keys):
+    if not isinstance(obj, (dict, list)): return None
+    if isinstance(obj, dict):
+        for k in keys:
+            if k in obj and obj[k] not in [None, "", "null", "None"]:
+                return obj[k]
+        for v in obj.values():
+            res = find_deep(v, keys)
+            if res: return res
+    elif isinstance(obj, list):
+        for item in obj:
+            res = find_deep(item, keys)
+            if res: return res
+    return None
+
 def main_kb():
     kb = types.InlineKeyboardMarkup(row_width=2)
     kb.add(
@@ -148,18 +163,19 @@ def search_num(m):
     q = p[1].strip()
     wait = bot.reply_to(m, "⚡ *Searching database...*", parse_mode='Markdown')
     try:
-        res = requests.get(API_URL, params={"key": API_KEY, "mobile": q}, timeout=12).json()
-        name = res.get("name") or res.get("caller") or res.get("fullName")
-        address = res.get("address") or res.get("location")
-        carrier = res.get("carrier") or res.get("operator")
-        circle = res.get("circle") or res.get("state")
-        if not name and isinstance(res.get("data"), dict):
-            d = res["data"]
-            name, address = d.get("name"), d.get("address")
-            carrier, circle = d.get("carrier"), d.get("circle")
-        if not name and not address and not carrier:
-            bot.edit_message_text("⚠️ Records nahi mile.", chat_id=m.chat.id, message_id=wait.message_id)
+        res = requests.get(API_URL, params={"key": API_KEY, "mobile": q}, timeout=15).json()
+
+        name = find_deep(res, ['name', 'Name', 'fullName', 'caller', 'callerName', 'owner', 'user'])
+        address = find_deep(res, ['address', 'Address', 'fullAddress', 'location_address', 'street', 'city'])
+        carrier = find_deep(res, ['carrier', 'Carrier', 'operator', 'Operator', 'sim', 'network'])
+        circle = find_deep(res, ['circle', 'Circle', 'telecom_circle', 'state', 'location', 'region'])
+        alt_number = find_deep(res, ['alt_mobile', 'alt_phone', 'alternate_number', 'alt_num'])
+
+        if not name and not address and not carrier and not circle:
+            err = res.get('message') or res.get('error') or "Records nahi mile."
+            bot.edit_message_text(f"⚠️ {err}", chat_id=m.chat.id, message_id=wait.message_id)
             return
+
         u["credits"] -= 1
         save_db(db)
         card = (
@@ -169,6 +185,7 @@ def search_num(m):
             f"Phone   : {q}\n"
             f"Name    : {name or 'N/A'}\n"
             f"Address : {address or 'N/A'}\n"
+            f"Alt Num : {alt_number or 'None'}\n"
             f"Carrier : {carrier or 'N/A'}\n"
             f"Circle  : {circle or 'India'}\n"
             f"------------------------\n"
@@ -235,4 +252,3 @@ def callbacks(c):
 if __name__ == '__main__':
     threading.Thread(target=run_web).start()
     bot.infinity_polling()
-    
