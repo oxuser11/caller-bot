@@ -60,7 +60,6 @@ def find_deep(obj, keys):
             if res: return res
     return None
 
-# Permanent Keyboard at the bottom
 def permanent_kb():
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     b1 = types.KeyboardButton("💳 Balance")
@@ -109,7 +108,6 @@ def start_cmd(m):
     )
     bot.reply_to(m, msg, parse_mode='Markdown', reply_markup=permanent_kb())
 
-# Permanent Keyboard Button Handlers
 @bot.message_handler(func=lambda m: m.text == "💳 Balance")
 def btn_balance(m):
     uid = m.from_user.id
@@ -187,7 +185,7 @@ def search_num(m):
         bot.reply_to(m, "⚠️ Sahi format: `/num 9876543210`", parse_mode='Markdown')
         return
     q = p[1].strip()
-    wait = bot.reply_to(m, "⚡ *Searching database...*", parse_mode='Markdown')
+    wait_msg = bot.reply_to(m, "⚡ *Searching database...*", parse_mode='Markdown')
     try:
         res = requests.get(API_URL, params={"key": API_KEY, "mobile": q}, timeout=15).json()
 
@@ -199,7 +197,7 @@ def search_num(m):
 
         if not name and not address and not carrier and not circle:
             err = res.get('message') or res.get('error') or "Records nahi mile."
-            bot.edit_message_text(f"⚠️ {err}", chat_id=m.chat.id, message_id=wait.message_id)
+            bot.edit_message_text(f"⚠️ {err}", chat_id=m.chat.id, message_id=wait_msg.message_id)
             return
 
         u["credits"] -= 1
@@ -222,7 +220,7 @@ def search_num(m):
         )
         bot.edit_message_text(card, chat_id=m.chat.id, message_id=wait_msg.message_id, parse_mode='Markdown')
     except Exception as e:
-        bot.edit_message_text(f"❌ Error: {e}", chat_id=m.chat.id, message_id=wait.message_id)
+        bot.edit_message_text(f"❌ Error: {e}", chat_id=m.chat.id, message_id=wait_msg.message_id)
 
 @bot.message_handler(commands=['all'])
 def broadcast(m):
@@ -271,4 +269,4 @@ def callbacks(c):
 if __name__ == '__main__':
     threading.Thread(target=run_web).start()
     bot.infinity_polling()
-            
+        
