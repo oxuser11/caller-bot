@@ -1,23 +1,13 @@
-import os
-import re
-import json
-import random
-import string
-import threading
-import requests
-import telebot
+import os, re, json, random, string, threading, requests, telebot
 from telebot import types
 from flask import Flask
 
 app = Flask(__name__)
-
 @app.route('/')
-def home():
-    return "OX TELEGRAM BOT RUNNING 24/7"
+def home(): return "OX BOT 24/7 LIVE"
 
 def run_web():
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
 
 BOT_TOKEN = "8900604597:AAGN6rmhnOHkoPiJsrwPzUezcxVveDcLgN0"
 API_KEY = "cybershr1k_6772fb6a04705e3268"
@@ -33,333 +23,214 @@ DB_FILE = "users_db.json"
 def load_db():
     if os.path.exists(DB_FILE):
         try:
-            with open(DB_FILE, 'r') as f:
-                return json.load(f)
-        except Exception:
-            return {}
+            with open(DB_FILE, 'r') as f: return json.load(f)
+        except: return {}
     return {}
 
 def save_db(data):
-    with open(DB_FILE, 'w') as f:
-        json.dump(data, f, indent=4)
+    with open(DB_FILE, 'w') as f: json.dump(data, f)
 
 db = load_db()
 
-def get_user(user_id):
-    str_id = str(user_id)
-    if str_id not in db:
-        db[str_id] = {
-            "credits": 5,
-            "referred_by": None,
-            "referrals": 0,
-            "lang": "hinglish"
-        }
+def get_user(uid):
+    s = str(uid)
+    if s not in db:
+        db[s] = {"credits": 5, "referrals": 0}
         save_db(db)
-    elif "lang" not in db[str_id]:
-        db[str_id]["lang"] = "hinglish"
-        save_db(db)
-    return db[str_id]
+    return db[s]
 
-def is_user_joined(user_id):
+def is_joined(uid):
     try:
-        member = bot.get_chat_member(CHANNEL_ID, user_id)
-        if member.status in ['member', 'administrator', 'creator']:
-            return True
-        return False
-    except Exception:
-        return False
+        m = bot.get_chat_member(CHANNEL_ID, uid)
+        return m.status in ['member', 'administrator', 'creator']
+    except: return False
 
-def force_join_markup():
-    markup = types.InlineKeyboardMarkup(row_width=1)
-    markup.add(
-        types.InlineKeyboardButton("📢 Join Channel", url=TG_CHANNEL_LINK),
-        types.InlineKeyboardButton("⚡ Verify Membership", callback_data="verify_join")
+def main_kb():
+    kb = types.InlineKeyboardMarkup(row_width=2)
+    kb.add(
+        types.InlineKeyboardButton("💳 Balance", callback_data="bal"),
+        types.InlineKeyboardButton("🎁 Refer", callback_data="ref"),
+        types.InlineKeyboardButton("💎 Buy Credits", url=f"https://t.me/{ADMIN_USERNAME}"),
+        types.InlineKeyboardButton("📢 Channel", url=TG_CHANNEL_LINK)
     )
-    return markup
+    return kb
 
-def main_menu_markup():
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    b1 = types.InlineKeyboardButton("💳 Balance", callback_data="btn_profile")
-    b2 = types.InlineKeyboardButton("🎁 Refer & Earn", callback_data="btn_refer")
-    b3 = types.InlineKeyboardButton("💎 Buy Credits", callback_data="btn_buy")
-    b4 = types.InlineKeyboardButton("💬 Support", url=f"https://t.me/{ADMIN_USERNAME}")
-    b5 = types.InlineKeyboardButton("🌐 Language", callback_data="btn_lang")
-    markup.add(b1, b2)
-    markup.add(b3, b4)
-    markup.add(b5)
-    return markup
-
-def find_deep_value(obj, keys):
-    if not isinstance(obj, dict):
-        return None
-    for k in keys:
-        if k in obj and obj[k] not in [None, "", "null"]:
-            return obj[k]
-    for k, v in obj.items():
-        if isinstance(v, dict):
-            res = find_deep_value(v, keys)
-            if res:
-                return res
-        elif isinstance(v, list):
-            for item in v:
-                if isinstance(item, dict):
-                    res = find_deep_value(item, keys)
-                    if res:
-                        return res
-    return None
+def join_kb():
+    kb = types.InlineKeyboardMarkup(row_width=1)
+    kb.add(
+        types.InlineKeyboardButton("📢 Join Channel", url=TG_CHANNEL_LINK),
+        types.InlineKeyboardButton("⚡ Verify Membership", callback_data="verify")
+    )
+    return kb
 
 @bot.message_handler(commands=['start'])
-def send_welcome(message):
-    user_id = message.from_user.id
-    str_id = str(user_id)
-    args = message.text.split()
-
-    if str_id not in db:
-        referrer_id = None
-        if len(args) > 1 and args[1].isdigit() and args[1] != str_id:
-            referrer_id = args[1]
-            if referrer_id in db:
-                db[referrer_id]["credits"] += 3
-                db[referrer_id]["referrals"] += 1
-                try:
-                    bot.send_message(int(referrer_id), "🎉 *Referral Success!*\n+3 Credits added!", parse_mode='Markdown')
-                except Exception:
-                    pass
-
-        db[str_id] = {
-            "credits": 5,
-            "referred_by": referrer_id,
-            "referrals": 0,
-            "lang": "hinglish"
-        }
+def start_cmd(m):
+    uid, text = m.from_user.id, m.text.split()
+    s = str(uid)
+    if s not in db:
+        ref = text[1] if len(text) > 1 and text[1].isdigit() and text[1] != s else None
+        if ref and ref in db:
+            db[ref]["credits"] += 3
+            db[ref]["referrals"] += 1
+            try: bot.send_message(int(ref), "🎉 *Referral!* +3 Credits mil gaye!", parse_mode='Markdown')
+            except: pass
+        db[s] = {"credits": 5, "referrals": 0}
         save_db(db)
-
-    user_data = get_user(user_id)
-
-    if not is_user_joined(user_id):
-        join_msg = "🔒 *ACCESS DENIED*\nBot use karne ke liye pehle official channel join karein aur verify dabayein."
-        bot.reply_to(message, join_msg, parse_mode='Markdown', reply_markup=force_join_markup())
+    
+    if not is_joined(uid):
+        bot.reply_to(m, "🔒 *Access Locked!*\nPehle hamara channel join karein aur verify dabayein.", parse_mode='Markdown', reply_markup=join_kb())
         return
 
-    welcome_text = (
-        f"⚡ *OX INTELLIGENCE SYSTEM* ⚡\n\n"
-        f"👋 Welcome, *{message.from_user.first_name}*!\n\n"
-        f"💳 *Balance:* `{user_data['credits']} Credits`\n"
-        f"👥 *Invited:* `{user_data['referrals']} Users`\n\n"
-        f"💬 *How to search:*\n"
-        f"👉 `/num 9876543210`\n"
+    u = get_user(uid)
+    msg = (
+        f"⚡ *OX CALLER SYSTEM* ⚡\n\n"
+        f"👋 Welcome, *{m.from_user.first_name}*!\n"
+        f"💳 *Balance:* `{u['credits']} Credits`\n"
+        f"👥 *Invites:* `{u['referrals']}`\n\n"
+        f"🔍 *Search Number:* `/num 9876543210`\n"
         f"🎟 *Claim Voucher:* `/claim CODE`\n\n"
         f"👑 *Modded By Rehan* | `@{ADMIN_USERNAME}`"
     )
-    bot.reply_to(message, welcome_text, parse_mode='Markdown', reply_markup=main_menu_markup())
-    @bot.message_handler(commands=['redeem'])
-def generate_redeem_code(message):
-    if message.from_user.id != ADMIN_ID:
-        return
-    parts = message.text.split()
-    if len(parts) != 3:
-        bot.reply_to(message, "⚠️ Usage: `/redeem <credits> <members>`\nExample: `/redeem 100 20`", parse_mode='Markdown')
-        return
-    try:
-        credits_amount = int(parts[1])
-        max_uses = int(parts[2])
-    except ValueError:
-        bot.reply_to(message, "⚠️ Numbers only.", parse_mode='Markdown')
-        return
+    bot.reply_to(m, msg, parse_mode='Markdown', reply_markup=main_kb())
 
-    random_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-    if "redeem_codes" not in db:
-        db["redeem_codes"] = {}
-
-    db["redeem_codes"][random_code] = {
-        "credits": credits_amount,
-        "max_uses": max_uses,
-        "claimed_by": []
-    }
+@bot.message_handler(commands=['redeem'])
+def gen_code(m):
+    if m.from_user.id != ADMIN_ID: return
+    p = m.text.split()
+    if len(p) != 3:
+        bot.reply_to(m, "⚠️ Usage: `/redeem <credits> <members>`\nExample: `/redeem 100 20`", parse_mode='Markdown')
+        return
+    try: cr, limit = int(p[1]), int(p[2])
+    except: return
+    code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+    if "codes" not in db: db["codes"] = {}
+    db["codes"][code] = {"credits": cr, "limit": limit, "users": []}
     save_db(db)
-
-    out = (
-        f"🎟 *REDEEM CODE CREATED*\n\n"
-        f"🔑 Code: `{random_code}`\n"
-        f"🎁 Reward: `{credits_amount} Credits`\n"
-        f"👥 Limit: `{max_uses} Users`\n\n"
-        f"Share:\n`/claim {random_code}`"
-    )
-    bot.reply_to(message, out, parse_mode='Markdown')
+    bot.reply_to(m, f"🎟 *CODE CREATED*\nCode: `{code}`\nCredits: `{cr}`\nLimit: `{limit}`\n\nShare:\n`/claim {code}`", parse_mode='Markdown')
 
 @bot.message_handler(commands=['claim'])
-def claim_voucher(message):
-    user_id = message.from_user.id
-    str_id = str(user_id)
-    parts = message.text.split()
-    if len(parts) != 2:
-        bot.reply_to(message, "⚠️ Usage: `/claim <CODE>`", parse_mode='Markdown')
+def claim_code(m):
+    uid, s, p = m.from_user.id, str(m.from_user.id), m.text.split()
+    if len(p) != 2:
+        bot.reply_to(m, "⚠️ Usage: `/claim CODE`", parse_mode='Markdown')
         return
-    code_entered = parts[1].strip().upper()
-    if "redeem_codes" not in db or code_entered not in db["redeem_codes"]:
-        bot.reply_to(message, "❌ Invalid Code.", parse_mode='Markdown')
+    c = p[1].strip().upper()
+    if "codes" not in db or c not in db["codes"]:
+        bot.reply_to(m, "❌ Invalid Code!", parse_mode='Markdown')
         return
-    code_data = db["redeem_codes"][code_entered]
-    if str_id in code_data["claimed_by"]:
-        bot.reply_to(message, "⚠️ Pehle hi claim kar chuke hain!", parse_mode='Markdown')
+    cd = db["codes"][c]
+    if s in cd["users"]:
+        bot.reply_to(m, "⚠️ Pehle hi claim kar chuke hain!", parse_mode='Markdown')
         return
-    if len(code_data["claimed_by"]) >= code_data["max_uses"]:
-        bot.reply_to(message, "⌛ Code Expired!", parse_mode='Markdown')
+    if len(cd["users"]) >= cd["limit"]:
+        bot.reply_to(m, "⌛ Code Expired!", parse_mode='Markdown')
         return
-
-    user_data = get_user(user_id)
-    credit_gift = code_data["credits"]
-    user_data["credits"] += credit_gift
-    code_data["claimed_by"].append(str_id)
+    u = get_user(uid)
+    u["credits"] += cd["credits"]
+    cd["users"].append(s)
     save_db(db)
-
-    bot.reply_to(message, f"🎉 Claimed! +{credit_gift} Credits. Total: {user_data['credits']}")
+    bot.reply_to(m, f"🎉 *Claimed!* +{cd['credits']} Credits. Total: `{u['credits']}`", parse_mode='Markdown')
 
 @bot.message_handler(commands=['num'])
-def lookup_number(message):
-    user_id = message.from_user.id
-    user_data = get_user(user_id)
-
-    if not is_user_joined(user_id):
-        bot.reply_to(message, "🔒 Pehle channel join karein!", parse_mode='Markdown', reply_markup=force_join_markup())
+def search_num(m):
+    uid, u = m.from_user.id, get_user(m.from_user.id)
+    if not is_joined(uid):
+        bot.reply_to(m, "🔒 Pehle channel join karein!", parse_mode='Markdown', reply_markup=join_kb())
         return
-
-    if user_data["credits"] <= 0:
+    if u["credits"] <= 0:
         bot_info = bot.get_me()
-        ref_link = f"https://t.me/{bot_info.username}?start={user_id}"
-        no_credit = f"⚠️ Balance 0 ho gaya hai!\n\nRefer karein (+3 Credits):\n`{ref_link}`"
-        bot.reply_to(message, no_credit, parse_mode='Markdown')
+        bot.reply_to(m, f"⚠️ Balance khatam! Refer karein (+3 Credits):\n`https://t.me/{bot_info.username}?start={uid}`", parse_mode='Markdown')
         return
-
-    parts = message.text.split()
-    if len(parts) < 2 or not re.match(r'^[6-9]\d{9}$', parts[1].strip()):
-        bot.reply_to(message, "⚠️ Sahi tarika: `/num 9876543210`", parse_mode='Markdown')
+    p = m.text.split()
+    if len(p) < 2 or not re.match(r'^[6-9]\d{9}$', p[1].strip()):
+        bot.reply_to(m, "⚠️ Sahi format: `/num 9876543210`", parse_mode='Markdown')
         return
-
-    query_num = parts[1].strip()
-    wait_msg = bot.reply_to(message, "⚡ *Searching database...*", parse_mode='Markdown')
-
+    q = p[1].strip()
+    wait = bot.reply_to(m, "⚡ *Searching database...*", parse_mode='Markdown')
     try:
-        res = requests.get(API_URL, params={"key": API_KEY, "mobile": query_num}, timeout=12)
-        data = res.json()
-
-        name = find_deep_value(data, ['name', 'Name', 'fullName', 'caller', 'callerName', 'owner', 'user'])
-        address = find_deep_value(data, ['address', 'Address', 'fullAddress', 'location_address', 'street', 'city'])
-        carrier = find_deep_value(data, ['carrier', 'Carrier', 'operator', 'Operator', 'sim', 'network'])
-        circle = find_deep_value(data, ['circle', 'Circle', 'telecom_circle', 'state', 'location', 'region'])
-        alt_number = find_deep_value(data, ['alt_mobile', 'alt_phone', 'alternate_number', 'alt_num'])
-
-        if not name and not carrier and not circle and not address:
-            err_msg = data.get('message') or "Details nahi mili."
-            bot.edit_message_text(f"⚠️ {err_msg}", chat_id=message.chat.id, message_id=wait_msg.message_id)
+        res = requests.get(API_URL, params={"key": API_KEY, "mobile": q}, timeout=12).json()
+        name = res.get("name") or res.get("caller") or res.get("fullName")
+        address = res.get("address") or res.get("location")
+        carrier = res.get("carrier") or res.get("operator")
+        circle = res.get("circle") or res.get("state")
+        if not name and isinstance(res.get("data"), dict):
+            d = res["data"]
+            name, address = d.get("name"), d.get("address")
+            carrier, circle = d.get("carrier"), d.get("circle")
+        if not name and not address and not carrier:
+            bot.edit_message_text("⚠️ Records nahi mile.", chat_id=m.chat.id, message_id=wait.message_id)
             return
-
-        user_data["credits"] -= 1
+        u["credits"] -= 1
         save_db(db)
-
-        copyable_card = (
+        card = (
             f"```text\n"
-            f"TARGET INFORMATION\n"
+            f"TARGET DETAILS\n"
             f"------------------------\n"
-            f"Phone    : {query_num}\n"
-            f"Name     : {name or 'N/A'}\n"
-            f"Address  : {address or 'N/A'}\n"
-            f"Alt Phone: {alt_number or 'None'}\n"
-            f"Carrier  : {carrier or 'N/A'}\n"
-            f"Circle   : {circle or 'India'}\n"
+            f"Phone   : {q}\n"
+            f"Name    : {name or 'N/A'}\n"
+            f"Address : {address or 'N/A'}\n"
+            f"Carrier : {carrier or 'N/A'}\n"
+            f"Circle  : {circle or 'India'}\n"
             f"------------------------\n"
             f"Verified by OX\n"
-            f"```"
+            f"```\n"
+            f"💳 Remaining: `{u['credits']} Credits`\n"
+            f"👆 *Tap text to copy*"
         )
-        footer = f"\n💳 Remaining: `{user_data['credits']} Credits`\n👆 *Tap to copy text*"
-        bot.edit_message_text(f"{copyable_card}{footer}", chat_id=message.chat.id, message_id=wait_msg.message_id, parse_mode='Markdown')
-
+        bot.edit_message_text(card, chat_id=m.chat.id, message_id=wait.message_id, parse_mode='Markdown')
     except Exception as e:
-        bot.edit_message_text(f"❌ Error: {str(e)}", chat_id=message.chat.id, message_id=wait_msg.message_id)
-    @bot.message_handler(commands=['all'])
-def broadcast_all(message):
-    if message.from_user.id != ADMIN_ID:
-        return
+        bot.edit_message_text(f"❌ Error: {e}", chat_id=m.chat.id, message_id=wait.message_id)
 
-    if message.reply_to_message:
-        target_msg = message.reply_to_message
-        count = 0
-        for uid in list(db.keys()):
-            if uid == "redeem_codes":
-                continue
-            try:
-                bot.copy_message(chat_id=int(uid), from_chat_id=message.chat.id, message_id=target_msg.message_id)
-                count += 1
-            except Exception:
-                pass
-        bot.reply_to(message, f"✅ Broadcast sent to `{count}` users.", parse_mode='Markdown')
-        return
-
-    raw_text = message.text.replace('/all', '', 1).strip()
-    if not raw_text:
-        bot.reply_to(message, "⚠️ Usage: `/all <message>` ya kisi post par Reply karke `/all` karein.", parse_mode='Markdown')
-        return
-
+@bot.message_handler(commands=['all'])
+def broadcast(m):
+    if m.from_user.id != ADMIN_ID: return
     count = 0
+    if m.reply_to_message:
+        for uid in list(db.keys()):
+            if uid == "codes": continue
+            try:
+                bot.copy_message(int(uid), m.chat.id, m.reply_to_message.message_id)
+                count += 1
+            except: pass
+        bot.reply_to(m, f"✅ Broadcast sent to {count} users.")
+        return
+    txt = m.text.replace('/all', '', 1).strip()
+    if not txt:
+        bot.reply_to(m, "⚠️ Reply to any msg with `/all` or type `/all text`")
+        return
     for uid in list(db.keys()):
-        if uid == "redeem_codes":
-            continue
+        if uid == "codes": continue
         try:
-            bot.send_message(int(uid), f"📢 *ANNOUNCEMENT*\n\n{raw_text}", parse_mode='Markdown')
+            bot.send_message(int(uid), f"📢 *ANNOUNCEMENT*\n\n{txt}", parse_mode='Markdown')
             count += 1
-        except Exception:
-            pass
-    bot.reply_to(message, f"✅ Broadcast delivered to `{count}` users.", parse_mode='Markdown')
+        except: pass
+    bot.reply_to(m, f"✅ Broadcast sent to {count} users.")
 
 @bot.message_handler(commands=['addcredit'])
-def add_credits_cmd(message):
-    if message.from_user.id != ADMIN_ID:
-        return
-    parts = message.text.split()
-    if len(parts) != 3:
-        bot.reply_to(message, "⚠️ Usage: `/addcredit <user_id> <amount>`")
-        return
-    target_id, amount = parts[1], int(parts[2])
-    if target_id in db:
-        db[target_id]["credits"] += amount
+def add_cr(m):
+    if m.from_user.id != ADMIN_ID: return
+    p = m.text.split()
+    if len(p) == 3 and p[1] in db:
+        db[p[1]]["credits"] += int(p[2])
         save_db(db)
-        bot.reply_to(message, f"✅ Added {amount} credits to {target_id}.")
-        try:
-            bot.send_message(int(target_id), f"🎁 Admin provided +{amount} Credits!")
-        except Exception:
-            pass
+        bot.reply_to(m, f"✅ Added {p[2]} credits to {p[1]}.")
 
-@bot.callback_query_handler(func=lambda call: True)
-def handle_callbacks(call):
-    user_id = call.from_user.id
-    user_data = get_user(user_id)
-
-    if call.data == "verify_join":
-        if is_user_joined(user_id):
-            bot.delete_message(call.message.chat.id, call.message.message_id)
-            bot.send_message(call.message.chat.id, "✅ Verified! Ab aap `/num <number>` bhej sakte hain.", reply_markup=main_menu_markup())
+@bot.callback_query_handler(func=lambda c: True)
+def callbacks(c):
+    uid, u = c.from_user.id, get_user(c.from_user.id)
+    if c.data == "verify":
+        if is_joined(uid):
+            bot.delete_message(c.message.chat.id, c.message.message_id)
+            bot.send_message(c.message.chat.id, "✅ Verified! Start searching with `/num <number>`", reply_markup=main_kb())
         else:
-            bot.answer_callback_query(call.id, "❌ Channel join nahi mila!", show_alert=True)
-
-    elif call.data == "btn_profile":
-        text = f"👤 *Account ID:* `{user_id}`\n💳 *Credits:* `{user_data['credits']}`\n👥 *Referrals:* `{user_data['referrals']}`"
-        bot.answer_callback_query(call.id)
-        bot.send_message(call.message.chat.id, text, parse_mode='Markdown')
-
-    elif call.data == "btn_refer":
+            bot.answer_callback_query(c.id, "❌ Join nahi mila!", show_alert=True)
+    elif c.data == "bal":
+        bot.answer_callback_query(c.id)
+        bot.send_message(c.message.chat.id, f"👤 *Account:* `{uid}`\n💳 *Balance:* `{u['credits']} Credits`\n👥 *Invites:* `{u['referrals']}`", parse_mode='Markdown')
+    elif c.data == "ref":
         bot_info = bot.get_me()
-        ref_link = f"https://t.me/{bot_info.username}?start={user_id}"
-        text = f"🎁 *Referral Link (+3 Credits):*\n`{ref_link}`\n\n👥 Total: `{user_data['referrals']}`"
-        bot.answer_callback_query(call.id)
-        bot.send_message(call.message.chat.id, text, parse_mode='Markdown')
-
-    elif call.data == "btn_buy":
-        text = f"💎 Contact to buy credits:\n👉 @{ADMIN_USERNAME}"
-        bot.answer_callback_query(call.id)
-        bot.send_message(call.message.chat.id, text)
-
-    elif call.data == "btn_lang":
-        bot.answer_callback_query(call.id, "Language: Default Hinglish active.")
+        bot.answer_callback_query(c.id)
+        bot.send_message(c.message.chat.id, f"🎁 *Referral Link (+3 Credits):*\n`https://t.me/{bot_info.username}?start={uid}`", parse_mode='Markdown')
 
 if __name__ == '__main__':
     threading.Thread(target=run_web).start()
