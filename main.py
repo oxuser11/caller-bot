@@ -60,15 +60,16 @@ def find_deep(obj, keys):
             if res: return res
     return None
 
-def main_kb():
-    kb = types.InlineKeyboardMarkup(row_width=2)
-    kb.add(
-        types.InlineKeyboardButton("💳 Balance", callback_data="bal"),
-        types.InlineKeyboardButton("🎁 Refer", callback_data="ref"),
-        types.InlineKeyboardButton("💎 Buy Credits", url=f"https://t.me/{ADMIN_USERNAME}"),
-        types.InlineKeyboardButton("📢 Channel", url=TG_CHANNEL_LINK)
-    )
-    return kb
+# Permanent Keyboard at the bottom
+def permanent_kb():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    b1 = types.KeyboardButton("💳 Balance")
+    b2 = types.KeyboardButton("🎁 Refer")
+    b3 = types.KeyboardButton("💎 Buy Credits")
+    b4 = types.KeyboardButton("📢 Channel")
+    markup.add(b1, b2)
+    markup.add(b3, b4)
+    return markup
 
 def join_kb():
     kb = types.InlineKeyboardMarkup(row_width=1)
@@ -106,7 +107,32 @@ def start_cmd(m):
         f"🎟 *Claim Voucher:* `/claim CODE`\n\n"
         f"👑 *Modded By Rehan* | `@{ADMIN_USERNAME}`"
     )
-    bot.reply_to(m, msg, parse_mode='Markdown', reply_markup=main_kb())
+    bot.reply_to(m, msg, parse_mode='Markdown', reply_markup=permanent_kb())
+
+# Permanent Keyboard Button Handlers
+@bot.message_handler(func=lambda m: m.text == "💳 Balance")
+def btn_balance(m):
+    uid = m.from_user.id
+    u = get_user(uid)
+    bot.reply_to(m, f"👤 *Account:* `{uid}`\n💳 *Balance:* `{u['credits']} Credits`\n👥 *Invites:* `{u['referrals']}`", parse_mode='Markdown')
+
+@bot.message_handler(func=lambda m: m.text == "🎁 Refer")
+def btn_refer(m):
+    uid = m.from_user.id
+    bot_info = bot.get_me()
+    bot.reply_to(m, f"🎁 *Referral Link (+3 Credits):*\n`https://t.me/{bot_info.username}?start={uid}`", parse_mode='Markdown')
+
+@bot.message_handler(func=lambda m: m.text == "💎 Buy Credits")
+def btn_buy(m):
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("💬 Contact Admin", url=f"https://t.me/{ADMIN_USERNAME}"))
+    bot.reply_to(m, f"💎 Credits buy karne ke liye Admin se contact karein:\n👉 `@{ADMIN_USERNAME}`", parse_mode='Markdown', reply_markup=markup)
+
+@bot.message_handler(func=lambda m: m.text == "📢 Channel")
+def btn_channel(m):
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("📢 Join Channel", url=TG_CHANNEL_LINK))
+    bot.reply_to(m, "Official channel join karein naye updates ke liye:", reply_markup=markup)
 
 @bot.message_handler(commands=['redeem'])
 def gen_code(m):
@@ -194,7 +220,7 @@ def search_num(m):
             f"💳 Remaining: `{u['credits']} Credits`\n"
             f"👆 *Tap text to copy*"
         )
-        bot.edit_message_text(card, chat_id=m.chat.id, message_id=wait.message_id, parse_mode='Markdown')
+        bot.edit_message_text(card, chat_id=m.chat.id, message_id=wait_msg.message_id, parse_mode='Markdown')
     except Exception as e:
         bot.edit_message_text(f"❌ Error: {e}", chat_id=m.chat.id, message_id=wait.message_id)
 
@@ -234,21 +260,15 @@ def add_cr(m):
 
 @bot.callback_query_handler(func=lambda c: True)
 def callbacks(c):
-    uid, u = c.from_user.id, get_user(c.from_user.id)
+    uid = c.from_user.id
     if c.data == "verify":
         if is_joined(uid):
             bot.delete_message(c.message.chat.id, c.message.message_id)
-            bot.send_message(c.message.chat.id, "✅ Verified! Start searching with `/num <number>`", reply_markup=main_kb())
+            bot.send_message(c.message.chat.id, "✅ Verified! Start searching with `/num <number>`", reply_markup=permanent_kb())
         else:
             bot.answer_callback_query(c.id, "❌ Join nahi mila!", show_alert=True)
-    elif c.data == "bal":
-        bot.answer_callback_query(c.id)
-        bot.send_message(c.message.chat.id, f"👤 *Account:* `{uid}`\n💳 *Balance:* `{u['credits']} Credits`\n👥 *Invites:* `{u['referrals']}`", parse_mode='Markdown')
-    elif c.data == "ref":
-        bot_info = bot.get_me()
-        bot.answer_callback_query(c.id)
-        bot.send_message(c.message.chat.id, f"🎁 *Referral Link (+3 Credits):*\n`https://t.me/{bot_info.username}?start={uid}`", parse_mode='Markdown')
 
 if __name__ == '__main__':
     threading.Thread(target=run_web).start()
     bot.infinity_polling()
+            
