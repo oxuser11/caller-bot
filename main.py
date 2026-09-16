@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "OX CALLER BOT 24/7 LIVE"
+    return "OX NUMBER BOT IS RUNNING"
 
 def run_web():
     port = int(os.environ.get("PORT", 8080))
@@ -20,7 +20,6 @@ def run_web():
 
 # 2. Configs
 BOT_TOKEN = "8609353017:AAGN3B9DvcFBnUO809FyC3VfaslmeOyr_gI"
-ADMIN_ID = 8671410379
 ADMIN_USER = "OxRehann"
 
 CH1_ID = "@OxRehanCyber"
@@ -33,7 +32,13 @@ API_KEY = "cybershr1k_b800c6028c1935c39a"
 DB_FILE = "caller_users.json"
 user_states = {}
 
-bot = telebot.TeleBot(BOT_TOKEN)
+bot = telebot.TeleBot(BOT_TOKEN, skip_pending=True)
+
+# Delete Webhook programmatically to prevent conflicts
+try:
+    bot.remove_webhook()
+except:
+    pass
 
 # 3. Database
 def load_db():
@@ -71,15 +76,16 @@ def check_member(uid):
     try:
         st = bot.get_chat_member(CH1_ID, uid).status
         return st in ['member', 'administrator', 'creator']
-    except:
+    except Exception as e:
+        # Agar bot channel me admin nahi hai toh error aane par block na kare
         return True
 
 # 4. Keyboards
 def verify_markup():
     kb = types.InlineKeyboardMarkup(row_width=1)
     kb.add(
-        types.InlineKeyboardButton("📢 Join Official Channel", url=CH1_LINK),
-        types.InlineKeyboardButton("📢 Join Backup Channel", url=CH2_LINK),
+        types.InlineKeyboardButton("📢 Join Channel 1", url=CH1_LINK),
+        types.InlineKeyboardButton("📢 Join Channel 2", url=CH2_LINK),
         types.InlineKeyboardButton("⚡ VERIFY & UNLOCK ⚡", callback_data="chk_verify")
     )
     return kb
@@ -91,7 +97,7 @@ def main_keyboard():
     kb.add(types.KeyboardButton("💎 Buy Credits"), types.KeyboardButton("📢 Channel"))
     return kb
 
-# 5. Start & Verify Handlers
+# 5. Handlers
 @bot.message_handler(commands=['start'])
 def start_handler(m):
     uid = m.from_user.id
@@ -116,8 +122,8 @@ def start_handler(m):
         bot.send_message(
             m.chat.id,
             f"👋 *Hey {user_name}!*\\n\\n"
-            "⚠️ Bot ko access karne ke liye official channels join karna zaroori hai.\\n\\n"
-            "Neeche diye channels join karke **⚡ VERIFY & UNLOCK ⚡** par click karein:",
+            "⚠️ Bot ke saare features unlock karne ke liye official channels join karein.\\n\\n"
+            "Join karne ke baad **⚡ VERIFY & UNLOCK ⚡** dabayein:",
             parse_mode='Markdown',
             reply_markup=verify_markup()
         )
@@ -125,11 +131,11 @@ def start_handler(m):
 
     bot.send_message(
         m.chat.id,
-        f"👑 **WELCOME {user_name.upper()}**\\n\\n"
-        f"👤 **Account:** `{uid}`\\n"
-        f"💳 **Balance:** `{u['credits']} Credits`\\n"
-        f"👥 **Invites:** `{u['invites']}`\\n\\n"
-        "Neeche buttons se select karein 👇",
+        f"👑 *WELCOME {user_name.upper()}*\\n\\n"
+        f"👤 *Account:* `{uid}`\\n"
+        f"💳 *Balance:* `{u['credits']} Credits`\\n"
+        f"👥 *Invites:* `{u['invites']}`\\n\\n"
+        "Neeche buttons se command choose karein 👇",
         parse_mode='Markdown',
         reply_markup=main_keyboard()
     )
@@ -166,13 +172,14 @@ def verify_callback(c):
         bot.answer_callback_query(c.id, "✅ Verified successfully!")
         bot.send_message(
             c.message.chat.id,
-            "🎉 **Account Verified!**\\n\\nBot unlock ho gaya hai.",
+            "🎉 *Account Verified!* Bot unlock ho gaya hai.",
+            parse_mode='Markdown',
             reply_markup=main_keyboard()
         )
     else:
-        bot.answer_callback_query(c.id, "❌ Pehle dono channel join karein!", show_alert=True)
+        bot.answer_callback_query(c.id, "❌ Pehle channels join karein!", show_alert=True)
 
-# 6. Button Clicks
+# 6. Button Actions
 @bot.message_handler(func=lambda m: "NUMBER TO INFO" in m.text.upper())
 def num_info_click(m):
     u = get_user(m.from_user.id)
@@ -183,7 +190,8 @@ def num_info_click(m):
     if u["credits"] < 1:
         bot.send_message(
             m.chat.id,
-            "⚠️ **Credits Khatam!**\\n\\nNumber details nikalne ke liye minimum **1 Credit** chahiye.\\nRefer karke credits earn karein.",
+            "⚠️ *Credits Khatam!*\\n\\nDetails nikalne ke liye minimum *1 Credit* chahiye. Refer karke credits badhayein.",
+            parse_mode='Markdown',
             reply_markup=main_keyboard()
         )
         return
@@ -191,7 +199,8 @@ def num_info_click(m):
     user_states[m.from_user.id] = "waiting_for_number"
     bot.send_message(
         m.chat.id,
-        "📱 **Enter 10-Digit Mobile Number:**\\n\\nJis number ka data chahiye wo yahan bhejein.\\n_(Cancel karne ke liye /cancel likhein)_"
+        "📱 *Enter 10-Digit Mobile Number:*\\n\\nJis number ki info nikalni hai wo type karke bhejein.\\n_(Cancel karne ke liye /cancel likhein)_",
+        parse_mode='Markdown'
     )
 
 @bot.message_handler(func=lambda m: "BALANCE" in m.text.upper())
@@ -200,11 +209,11 @@ def balance_click(m):
     u = get_user(m.from_user.id, m.from_user.first_name)
     bot.send_message(
         m.chat.id,
-        f"┌─── ❖ **ACCOUNT** ❖ ───\\n"
-        f"│ 👤 **User:** `{u['name']}`\\n"
-        f"│ 🆔 **Account:** `{m.from_user.id}`\\n"
-        f"│ 💳 **Balance:** `{u['credits']} Credits`\\n"
-        f"│ 👥 **Invites:** `{u['invites']}`\\n"
+        f"┌─── ❖ *ACCOUNT DETAILS* ❖ ───\\n"
+        f"│ 👤 *User:* `{u['name']}`\\n"
+        f"│ 🆔 *Account:* `{m.from_user.id}`\\n"
+        f"│ 💳 *Balance:* `{u['credits']} Credits`\\n"
+        f"│ 👥 *Invites:* `{u['invites']}`\\n"
         f"└─── ❖ ─────────────── ❖ ───",
         parse_mode='Markdown',
         reply_markup=main_keyboard()
@@ -217,7 +226,7 @@ def refer_click(m):
     bot_uname = bot.get_me().username
     bot.send_message(
         m.chat.id,
-        f"🎁 **Referral Link (+3 Credits):**\\n"
+        f"🎁 *Referral Link (+3 Credits):*\\n"
         f"https://t.me/{bot_uname}?start={uid}\\n\\n"
         "Apne dosto ko share karein. Har join par 3 credits milenge!",
         reply_markup=main_keyboard()
@@ -228,7 +237,7 @@ def buy_click(m):
     user_states.pop(m.from_user.id, None)
     bot.send_message(
         m.chat.id,
-        f"💎 **Credits khareedne ke liye admin ko contact karein:**\\n👉 @{ADMIN_USER}",
+        f"💎 *Credits khareedne ke liye admin se contact karein:*\\n👉 @{ADMIN_USER}",
         reply_markup=main_keyboard()
     )
 
@@ -242,7 +251,7 @@ def channel_click(m):
 @bot.message_handler(commands=['cancel'])
 def cancel_handler(m):
     user_states.pop(m.from_user.id, None)
-    bot.send_message(m.chat.id, "❌ Action canceled.", reply_markup=main_keyboard())
+    bot.send_message(m.chat.id, "❌ Cancel kar diya gaya.", reply_markup=main_keyboard())
 
 # 7. Number Data Lookup
 @bot.message_handler(func=lambda m: user_states.get(m.from_user.id) == "waiting_for_number")
@@ -253,7 +262,7 @@ def process_number(m):
 
     mobile = m.text.strip().replace(" ", "").replace("+91", "")
     if not mobile.isdigit() or len(mobile) != 10:
-        bot.send_message(m.chat.id, "❌ Galat number! 10-digit number bhejey.", reply_markup=main_keyboard())
+        bot.send_message(m.chat.id, "❌ Galat number! Kripya sahi 10-digit number bhejein.", reply_markup=main_keyboard())
         return
 
     load_msg = bot.send_message(m.chat.id, "🔍 *Searching Database...*", parse_mode='Markdown')
@@ -273,25 +282,25 @@ def process_number(m):
         data = res.get("data", res)
         lines = [
             "╔══════════════════════════╗",
-            "   🔍 **NUMBER INFORMATION**   ",
+            "   🔍 *NUMBER INFORMATION*   ",
             "╚══════════════════════════╝\\n",
-            f"📱 **Mobile:** `{mobile}`"
+            f"📱 *Mobile:* `{mobile}`"
         ]
 
         if isinstance(data, dict):
             for k, v in data.items():
                 if k.lower() not in ["status", "success", "key", "code"] and v:
-                    lines.append(f"🔹 **{k.replace('_', ' ').title()}:** `{v}`")
+                    lines.append(f"🔹 *{k.replace('_', ' ').title()}:* `{v}`")
         elif isinstance(data, list) and len(data) > 0:
             first = data[0]
             if isinstance(first, dict):
                 for k, v in first.items():
                     if v:
-                        lines.append(f"🔹 **{k.replace('_', ' ').title()}:** `{v}`")
+                        lines.append(f"🔹 *{k.replace('_', ' ').title()}:* `{v}`")
         else:
-            lines.append(f"🔹 **Result:** `{data}`")
+            lines.append(f"🔹 *Result:* `{data}`")
 
-        lines.append(f"\\n💳 **Remaining Credits:** `{u['credits']}`")
+        lines.append(f"\\n💳 *Remaining Credits:* `{u['credits']}`")
 
         bot.delete_message(m.chat.id, load_msg.message_id)
         bot.send_message(m.chat.id, "\\n".join(lines), parse_mode='Markdown', reply_markup=main_keyboard())
@@ -300,6 +309,6 @@ def process_number(m):
         bot.edit_message_text("❌ API Server offline ya busy hai. Baad me try karein.", chat_id=m.chat.id, message_id=load_msg.message_id)
 
 if __name__ == '__main__':
-    threading.Thread(target=run_web).start()
-    bot.infinity_polling()
-    
+    threading.Thread(target=run_web, daemon=True).start()
+    bot.infinity_polling(timeout=10, long_polling_timeout=5)
+                    
