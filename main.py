@@ -2,6 +2,8 @@ import os
 import json
 import time
 import threading
+import random
+import string
 import requests
 import telebot
 from telebot import types
@@ -18,8 +20,9 @@ def run_web():
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
 
-# 2. Configurations
+# 2. Configurations & Secret Admin Access
 BOT_TOKEN = "8609353017:AAGN3B9DvcFBnUO809FyC3VfaslmeOyr_gI"
+ADMIN_ID = 8671410379
 ADMIN_USER = "OxRehann"
 
 CH1_ID = "@OxRehanCyber"
@@ -39,20 +42,25 @@ try:
 except Exception:
     pass
 
-# 3. Database Functions
+# 3. Permanent Database System
 def load_db():
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, 'r') as f:
-                return json.load(f)
+                data = json.load(f)
+                if "users" not in data:
+                    data["users"] = {}
+                if "redeems" not in data:
+                    data["redeems"] = {}
+                return data
         except Exception:
             pass
-    return {"users": {}}
+    return {"users": {}, "redeems": {}}
 
 def save_db(data):
     try:
         with open(DB_FILE, 'w') as f:
-            json.dump(data, f)
+            json.dump(data, f, indent=2)
     except Exception:
         pass
 
@@ -82,8 +90,8 @@ def check_member(uid):
 def verify_markup():
     kb = types.InlineKeyboardMarkup(row_width=1)
     kb.add(
-        types.InlineKeyboardButton("📢 Join Official Channel", url=CH1_LINK),
-        types.InlineKeyboardButton("📢 Join Backup Channel", url=CH2_LINK),
+        types.InlineKeyboardButton("📢 Join Channel 1", url=CH1_LINK),
+        types.InlineKeyboardButton("📢 Join Channel 2", url=CH2_LINK),
         types.InlineKeyboardButton("⚡ VERIFY & UNLOCK ⚡", callback_data="chk_verify")
     )
     return kb
@@ -95,7 +103,127 @@ def main_keyboard():
     kb.add(types.KeyboardButton("💎 Buy Credits"), types.KeyboardButton("📢 Channel"))
     return kb
 
-# 5. Handlers
+# 5. Secret Admin Features
+@bot.message_handler(commands=['gen'])
+def gen_code(m):
+    if m.from_user.id != ADMIN_ID:
+        return
+    parts = m.text.split()
+    if len(parts) < 2 or not parts[1].isdigit():
+        bot.reply_to(m, "⚠️ Format: `/gen <credits>`\nExample: `/gen 10`", parse_mode='Markdown')
+        return
+
+    amt = int(parts[1])
+    code = "OX-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+    db["redeems"][code] = amt
+    save_db(db)
+
+    bot.reply_to(
+        m,
+        f"✅ <b>Redeem Code Created!</b>\n\n"
+        f"🔑 <b>Code:</b> <code>{code}</code>\n"
+        f"💎 <b>Value:</b> <code>{amt} Credits</code>\n\n"
+        f"<i>Share this code with users:</i>\n<code>/claim {code}</code>",
+        parse_mode='HTML'
+    )
+
+@bot.message_handler(commands=['all'])
+def broadcast_all(m):
+    if m.from_user.id != ADMIN_ID:
+        return
+    msg = m.text.replace("/all", "", 1).strip()
+    if not msg:
+        bot.reply_to(m, "⚠️ Message empty hai! Format: `/all Your message here`", parse_mode='Markdown')
+        return
+
+    users = list(db["users"].keys())
+    sent = 0
+    failed = 0
+    stat_msg = bot.reply_to(m, f"🚀 Sending broadcast to {len(users)} users...")
+
+    for u in users:
+        try:
+            bot.send_message(int(u), f"📢 <b>ANNOUNCEMENT:</b>\n\n{msg}", parse_mode='HTML')
+            sent += 1
+            time.sleep(0.05)
+        except Exception:
+            failed += 1
+
+    bot.edit_message_text(
+        f"✅ <b>Broadcast Completed!</b>\n\n📤 Sent: <code>{sent}</code>\n❌ Failed: <code>{failed}</code>",
+        chat_id=m.chat.id,
+        message_id=stat_msg.message_id,
+        parse_mode='HTML'
+    )
+
+@bot.message_handler(commands=['add'])
+def add_credits_cmd(m):
+    if m.from_user.id != ADMIN_ID:
+        return
+    parts = m.text.split()
+    if len(parts) < 3 or not parts[2].isdigit():
+        bot.reply_to(m, "⚠️ Format: `/add <user_id> <amount>`\nExample: `/add 8671410379 20`", parse_mode='Markdown')
+        return
+
+    t_id = parts[1]
+    amt = int(parts[2])
+    target = get_user(t_id)
+    target["credits"] += amt
+    save_db(db)
+
+    bot.reply_to(m, f"✅ <b>Success!</b> Added {amt} credits to <code>{t_id}</code>. Total: {target['credits']}", parse_mode='HTML')
+    try:
+        bot.send_message(int(t_id), f"💎 <b>Bonus Received!</b>\n\nAdmin credited <b>{amt} Credits</b> to your wallet!", parse_mode='HTML')
+    except Exception:
+        pass
+
+@bot.message_handler(commands=['stats'])
+def bot_stats(m):
+    if m.from_user.id != ADMIN_ID:
+        return
+    t_users = len(db["users"])
+    active_codes = len(db["redeems"])
+    t_credits = sum(u.get("credits", 0) for u in db["users"].values())
+
+    bot.reply_to(
+        m,
+        f"📊 <b>BOT LIVE STATS</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"👥 <b>Total Users:</b> <code>{t_users}</code>\n"
+        f"💳 <b>Circulating Credits:</b> <code>{t_credits}</code>\n"
+        f"🎟️ <b>Active Codes:</b> <code>{active_codes}</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━",
+        parse_mode='HTML'
+    )
+
+# 6. User Redeem Claim Handler
+@bot.message_handler(commands=['claim'])
+def claim_code(m):
+    uid = m.from_user.id
+    parts = m.text.split()
+    if len(parts) < 2:
+        bot.reply_to(m, "⚠️ Format: <code>/claim YOUR-CODE</code>", parse_mode='HTML')
+        return
+
+    code = parts[1].strip()
+    if code not in db["redeems"]:
+        bot.reply_to(m, "❌ Invalid ya Expired Redeem Code!", parse_mode='HTML')
+        return
+
+    amt = db["redeems"].pop(code)
+    u = get_user(uid, m.from_user.first_name)
+    u["credits"] += amt
+    save_db(db)
+
+    bot.reply_to(
+        m,
+        f"🎉 <b>Code Redeemed Successfully!</b>\n\n"
+        f"💎 Added: <b>+{amt} Credits</b>\n"
+        f"💳 New Balance: <code>{u['credits']} Credits</code>",
+        parse_mode='HTML',
+        reply_markup=main_keyboard()
+    )
+
+# 7. Start & Force Join System
 @bot.message_handler(commands=['start'])
 def start_handler(m):
     uid = m.from_user.id
@@ -120,7 +248,7 @@ def start_handler(m):
         welcome_join = (
             f"👋 <b>Hey, {user_name}!</b>\n\n"
             "⚠️ <b>Access Restricted!</b>\n"
-            "Bot ke saare features use karne ke liye pehle official channels join karein.\n\n"
+            "Bot ke saare tools use karne ke liye pehle official channels join karein.\n\n"
             "Join karne ke baad niche <b>VERIFY & UNLOCK</b> dabayein 👇"
         )
         bot.send_message(m.chat.id, welcome_join, parse_mode='HTML', reply_markup=verify_markup())
@@ -143,24 +271,25 @@ def verify_callback(c):
     u = get_user(uid, c.from_user.first_name)
 
     if check_member(uid):
-        u["verified"] = True
-        u["credits"] += 5
+        if not u.get("verified", False):
+            u["verified"] = True
+            u["credits"] += 5
 
-        ref_id = u.get("referrer")
-        if ref_id and ref_id in db["users"]:
-            db["users"][ref_id]["credits"] += 3
-            db["users"][ref_id]["invites"] += 1
-            u["referrer"] = None
-            try:
-                bot.send_message(
-                    int(ref_id),
-                    f"🎁 <b>Referral Bonus!</b>\n\n<code>{c.from_user.first_name}</code> ne aapka link use kiya.\n💎 <b>+3 Credits</b> add kar diye gaye!",
-                    parse_mode='HTML'
-                )
-            except Exception:
-                pass
+            ref_id = u.get("referrer")
+            if ref_id and ref_id in db["users"]:
+                db["users"][ref_id]["credits"] += 3
+                db["users"][ref_id]["invites"] += 1
+                u["referrer"] = None
+                try:
+                    bot.send_message(
+                        int(ref_id),
+                        f"🎁 <b>Referral Bonus!</b>\n\n<code>{c.from_user.first_name}</code> ne aapka link use kiya.\n💎 <b>+3 Credits</b> add kar diye gaye!",
+                        parse_mode='HTML'
+                    )
+                except Exception:
+                    pass
+            save_db(db)
 
-        save_db(db)
         try:
             bot.delete_message(c.message.chat.id, c.message.message_id)
         except Exception:
@@ -169,14 +298,14 @@ def verify_callback(c):
         bot.answer_callback_query(c.id, "✅ Verified!")
         bot.send_message(
             c.message.chat.id,
-            "🎉 <b>Account Verified Successfully!</b>\n\nBot unlock ho gaya hai. Ab aap number search kar sakte hain.",
+            "🎉 <b>Account Verified Successfully!</b>\n\nBot unlock ho gaya hai. Ab aap features access kar sakte hain.",
             parse_mode='HTML',
             reply_markup=main_keyboard()
         )
     else:
-        bot.answer_callback_query(c.id, "❌ Pehle channels join karein!", show_alert=True)
+        bot.answer_callback_query(c.id, "❌ Pehle dono channels join karein!", show_alert=True)
 
-# 6. Button Events
+# 8. Button Events
 @bot.message_handler(func=lambda m: "NUMBER TO INFO" in m.text.upper())
 def num_info_click(m):
     u = get_user(m.from_user.id)
@@ -187,7 +316,7 @@ def num_info_click(m):
     if u["credits"] < 1:
         bot.send_message(
             m.chat.id,
-            "⚠️ <b>Insufficient Credits!</b>\n\nSearch karne ke liye kam se kam <b>1 Credit</b> chahiye.\nRefer karke credits earn karein.",
+            "⚠️ <b>Insufficient Credits!</b>\n\nSearch karne ke liye kam se kam <b>1 Credit</b> chahiye.\nRefer karke ya claim karke credits earn karein.",
             parse_mode='HTML',
             reply_markup=main_keyboard()
         )
@@ -234,7 +363,7 @@ def buy_click(m):
     user_states.pop(m.from_user.id, None)
     bot.send_message(
         m.chat.id,
-        f"💎 <b>Recharge Credits:</b>\n\nCredits khareedne ke liye admin se contact karein:\n👉 @{ADMIN_USER}",
+        f"💎 <b>Recharge Credits:</b>\n\nCredits khareedne ke liye admin ko message karein:\n👉 @{ADMIN_USER}",
         parse_mode='HTML',
         reply_markup=main_keyboard()
     )
@@ -249,9 +378,9 @@ def channel_click(m):
 @bot.message_handler(commands=['cancel'])
 def cancel_handler(m):
     user_states.pop(m.from_user.id, None)
-    bot.send_message(m.chat.id, "❌ Cancel kar diya gaya.", reply_markup=main_keyboard())
+    bot.send_message(m.chat.id, "❌ Action cancel kar diya gaya.", reply_markup=main_keyboard())
 
-# 7. Formatted Results Processing
+# 9. Number Lookup Execution
 @bot.message_handler(func=lambda m: user_states.get(m.from_user.id) == "waiting_for_number")
 def process_number(m):
     uid = m.from_user.id
@@ -274,11 +403,9 @@ def process_number(m):
             bot.edit_message_text("❌ Is number ka koi record nahi mila.", chat_id=m.chat.id, message_id=load_msg.message_id)
             return
 
-        # Deduct 1 credit
         u["credits"] -= 1
         save_db(db)
 
-        # Parse Records correctly
         records = []
         raw_data = res.get("data", res)
 
@@ -330,3 +457,4 @@ def process_number(m):
 if __name__ == '__main__':
     threading.Thread(target=run_web, daemon=True).start()
     bot.infinity_polling(timeout=10, long_polling_timeout=5)
+                     
