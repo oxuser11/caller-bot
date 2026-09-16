@@ -7,18 +7,18 @@ import telebot
 from telebot import types
 from flask import Flask
 
-# 1. Web server for Render 24/7
+# 1. 24/7 Web Server for Render
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "OX NUMBER BOT IS RUNNING"
+    return "OX CALLER BOT RUNNING 24/7"
 
 def run_web():
     port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
 
-# 2. Configs
+# 2. Configurations
 BOT_TOKEN = "8609353017:AAGN3B9DvcFBnUO809FyC3VfaslmeOyr_gI"
 ADMIN_USER = "OxRehann"
 
@@ -34,19 +34,18 @@ user_states = {}
 
 bot = telebot.TeleBot(BOT_TOKEN, skip_pending=True)
 
-# Delete Webhook programmatically to prevent conflicts
 try:
     bot.remove_webhook()
-except:
+except Exception:
     pass
 
-# 3. Database
+# 3. Database Functions
 def load_db():
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, 'r') as f:
                 return json.load(f)
-        except:
+        except Exception:
             pass
     return {"users": {}}
 
@@ -54,7 +53,7 @@ def save_db(data):
     try:
         with open(DB_FILE, 'w') as f:
             json.dump(data, f)
-    except:
+    except Exception:
         pass
 
 db = load_db()
@@ -76,16 +75,15 @@ def check_member(uid):
     try:
         st = bot.get_chat_member(CH1_ID, uid).status
         return st in ['member', 'administrator', 'creator']
-    except Exception as e:
-        # Agar bot channel me admin nahi hai toh error aane par block na kare
+    except Exception:
         return True
 
 # 4. Keyboards
 def verify_markup():
     kb = types.InlineKeyboardMarkup(row_width=1)
     kb.add(
-        types.InlineKeyboardButton("📢 Join Channel 1", url=CH1_LINK),
-        types.InlineKeyboardButton("📢 Join Channel 2", url=CH2_LINK),
+        types.InlineKeyboardButton("📢 Join Official Channel", url=CH1_LINK),
+        types.InlineKeyboardButton("📢 Join Backup Channel", url=CH2_LINK),
         types.InlineKeyboardButton("⚡ VERIFY & UNLOCK ⚡", callback_data="chk_verify")
     )
     return kb
@@ -119,26 +117,25 @@ def start_handler(m):
     u = db["users"][s]
 
     if not u.get("verified", False):
-        bot.send_message(
-            m.chat.id,
-            f"👋 *Hey {user_name}!*\\n\\n"
-            "⚠️ Bot ke saare features unlock karne ke liye official channels join karein.\\n\\n"
-            "Join karne ke baad **⚡ VERIFY & UNLOCK ⚡** dabayein:",
-            parse_mode='Markdown',
-            reply_markup=verify_markup()
+        welcome_join = (
+            f"👋 <b>Hey, {user_name}!</b>\n\n"
+            "⚠️ <b>Access Restricted!</b>\n"
+            "Bot ke saare features use karne ke liye pehle official channels join karein.\n\n"
+            "Join karne ke baad niche <b>VERIFY & UNLOCK</b> dabayein 👇"
         )
+        bot.send_message(m.chat.id, welcome_join, parse_mode='HTML', reply_markup=verify_markup())
         return
 
-    bot.send_message(
-        m.chat.id,
-        f"👑 *WELCOME {user_name.upper()}*\\n\\n"
-        f"👤 *Account:* `{uid}`\\n"
-        f"💳 *Balance:* `{u['credits']} Credits`\\n"
-        f"👥 *Invites:* `{u['invites']}`\\n\\n"
-        "Neeche buttons se command choose karein 👇",
-        parse_mode='Markdown',
-        reply_markup=main_keyboard()
+    welcome_msg = (
+        f"👑 <b>WELCOME {user_name.upper()}</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 <b>Account ID:</b> <code>{uid}</code>\n"
+        f"💳 <b>Credits Balance:</b> <code>{u['credits']}</code>\n"
+        f"👥 <b>Total Referrals:</b> <code>{u['invites']}</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"Niche diye gaye buttons se use karein 👇"
     )
+    bot.send_message(m.chat.id, welcome_msg, parse_mode='HTML', reply_markup=main_keyboard())
 
 @bot.callback_query_handler(func=lambda c: c.data == "chk_verify")
 def verify_callback(c):
@@ -157,29 +154,29 @@ def verify_callback(c):
             try:
                 bot.send_message(
                     int(ref_id),
-                    f"🎁 *Referral Bonus!*\\n\\n`{c.from_user.first_name}` joined using your link.\\n💎 *+3 Credits* added!",
-                    parse_mode='Markdown'
+                    f"🎁 <b>Referral Bonus!</b>\n\n<code>{c.from_user.first_name}</code> ne aapka link use kiya.\n💎 <b>+3 Credits</b> add kar diye gaye!",
+                    parse_mode='HTML'
                 )
-            except:
+            except Exception:
                 pass
 
         save_db(db)
         try:
             bot.delete_message(c.message.chat.id, c.message.message_id)
-        except:
+        except Exception:
             pass
 
-        bot.answer_callback_query(c.id, "✅ Verified successfully!")
+        bot.answer_callback_query(c.id, "✅ Verified!")
         bot.send_message(
             c.message.chat.id,
-            "🎉 *Account Verified!* Bot unlock ho gaya hai.",
-            parse_mode='Markdown',
+            "🎉 <b>Account Verified Successfully!</b>\n\nBot unlock ho gaya hai. Ab aap number search kar sakte hain.",
+            parse_mode='HTML',
             reply_markup=main_keyboard()
         )
     else:
         bot.answer_callback_query(c.id, "❌ Pehle channels join karein!", show_alert=True)
 
-# 6. Button Actions
+# 6. Button Events
 @bot.message_handler(func=lambda m: "NUMBER TO INFO" in m.text.upper())
 def num_info_click(m):
     u = get_user(m.from_user.id)
@@ -190,8 +187,8 @@ def num_info_click(m):
     if u["credits"] < 1:
         bot.send_message(
             m.chat.id,
-            "⚠️ *Credits Khatam!*\\n\\nDetails nikalne ke liye minimum *1 Credit* chahiye. Refer karke credits badhayein.",
-            parse_mode='Markdown',
+            "⚠️ <b>Insufficient Credits!</b>\n\nSearch karne ke liye kam se kam <b>1 Credit</b> chahiye.\nRefer karke credits earn karein.",
+            parse_mode='HTML',
             reply_markup=main_keyboard()
         )
         return
@@ -199,45 +196,46 @@ def num_info_click(m):
     user_states[m.from_user.id] = "waiting_for_number"
     bot.send_message(
         m.chat.id,
-        "📱 *Enter 10-Digit Mobile Number:*\\n\\nJis number ki info nikalni hai wo type karke bhejein.\\n_(Cancel karne ke liye /cancel likhein)_",
-        parse_mode='Markdown'
+        "📱 <b>Enter 10-Digit Mobile Number:</b>\n\nJis number ka data nikalna hai wo type karke bhejein.\n<i>(Cancel karne ke liye /cancel likhein)</i>",
+        parse_mode='HTML'
     )
 
 @bot.message_handler(func=lambda m: "BALANCE" in m.text.upper())
 def balance_click(m):
     user_states.pop(m.from_user.id, None)
     u = get_user(m.from_user.id, m.from_user.first_name)
-    bot.send_message(
-        m.chat.id,
-        f"┌─── ❖ *ACCOUNT DETAILS* ❖ ───\\n"
-        f"│ 👤 *User:* `{u['name']}`\\n"
-        f"│ 🆔 *Account:* `{m.from_user.id}`\\n"
-        f"│ 💳 *Balance:* `{u['credits']} Credits`\\n"
-        f"│ 👥 *Invites:* `{u['invites']}`\\n"
-        f"└─── ❖ ─────────────── ❖ ───",
-        parse_mode='Markdown',
-        reply_markup=main_keyboard()
+    bal_card = (
+        f"┌─── ❖ <b>ACCOUNT WALLET</b> ❖ ───\n"
+        f"│ 👤 <b>User:</b> {u['name']}\n"
+        f"│ 🆔 <b>Account ID:</b> <code>{m.from_user.id}</code>\n"
+        f"│ 💳 <b>Balance:</b> <code>{u['credits']} Credits</code>\n"
+        f"│ 👥 <b>Invites:</b> <code>{u['invites']}</code>\n"
+        f"└─── ❖ ──────────────── ❖ ───"
     )
+    bot.send_message(m.chat.id, bal_card, parse_mode='HTML', reply_markup=main_keyboard())
 
 @bot.message_handler(func=lambda m: "REFER" in m.text.upper())
 def refer_click(m):
     user_states.pop(m.from_user.id, None)
     uid = m.from_user.id
     bot_uname = bot.get_me().username
-    bot.send_message(
-        m.chat.id,
-        f"🎁 *Referral Link (+3 Credits):*\\n"
-        f"https://t.me/{bot_uname}?start={uid}\\n\\n"
-        "Apne dosto ko share karein. Har join par 3 credits milenge!",
-        reply_markup=main_keyboard()
+    ref_card = (
+        f"🎁 <b>REFERRAL PROGRAM</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🔗 <b>Your Link:</b>\n"
+        f"<code>https://t.me/{bot_uname}?start={uid}</code>\n\n"
+        f"💎 Har friend ke verify karne par <b>3 Credits</b> milenge!\n"
+        f"━━━━━━━━━━━━━━━━━━━━"
     )
+    bot.send_message(m.chat.id, ref_card, parse_mode='HTML', reply_markup=main_keyboard())
 
 @bot.message_handler(func=lambda m: "BUY CREDITS" in m.text.upper())
 def buy_click(m):
     user_states.pop(m.from_user.id, None)
     bot.send_message(
         m.chat.id,
-        f"💎 *Credits khareedne ke liye admin se contact karein:*\\n👉 @{ADMIN_USER}",
+        f"💎 <b>Recharge Credits:</b>\n\nCredits khareedne ke liye admin se contact karein:\n👉 @{ADMIN_USER}",
+        parse_mode='HTML',
         reply_markup=main_keyboard()
     )
 
@@ -246,14 +244,14 @@ def channel_click(m):
     user_states.pop(m.from_user.id, None)
     kb = types.InlineKeyboardMarkup()
     kb.add(types.InlineKeyboardButton("📢 Join Channel", url=CH1_LINK))
-    bot.send_message(m.chat.id, "Hamara official channel join karein:", reply_markup=kb)
+    bot.send_message(m.chat.id, "Hamare updates channel ko join karein:", reply_markup=kb)
 
 @bot.message_handler(commands=['cancel'])
 def cancel_handler(m):
     user_states.pop(m.from_user.id, None)
     bot.send_message(m.chat.id, "❌ Cancel kar diya gaya.", reply_markup=main_keyboard())
 
-# 7. Number Data Lookup
+# 7. Formatted Results Processing
 @bot.message_handler(func=lambda m: user_states.get(m.from_user.id) == "waiting_for_number")
 def process_number(m):
     uid = m.from_user.id
@@ -262,10 +260,10 @@ def process_number(m):
 
     mobile = m.text.strip().replace(" ", "").replace("+91", "")
     if not mobile.isdigit() or len(mobile) != 10:
-        bot.send_message(m.chat.id, "❌ Galat number! Kripya sahi 10-digit number bhejein.", reply_markup=main_keyboard())
+        bot.send_message(m.chat.id, "❌ <b>Invalid Number!</b> Kripya sahi 10-digit number enter karein.", parse_mode='HTML', reply_markup=main_keyboard())
         return
 
-    load_msg = bot.send_message(m.chat.id, "🔍 *Searching Database...*", parse_mode='Markdown')
+    load_msg = bot.send_message(m.chat.id, "🔍 <i>Searching database records...</i>", parse_mode='HTML')
 
     try:
         req_url = f"{API_BASE}?key={API_KEY}&mobile={mobile}"
@@ -273,42 +271,62 @@ def process_number(m):
         res = r.json()
 
         if not res or res.get("status") is False or res.get("success") is False:
-            bot.edit_message_text("❌ Is number ka koi data nahi mila.", chat_id=m.chat.id, message_id=load_msg.message_id)
+            bot.edit_message_text("❌ Is number ka koi record nahi mila.", chat_id=m.chat.id, message_id=load_msg.message_id)
             return
 
+        # Deduct 1 credit
         u["credits"] -= 1
         save_db(db)
 
-        data = res.get("data", res)
-        lines = [
-            "╔══════════════════════════╗",
-            "   🔍 *NUMBER INFORMATION*   ",
-            "╚══════════════════════════╝\\n",
-            f"📱 *Mobile:* `{mobile}`"
-        ]
+        # Parse Records correctly
+        records = []
+        raw_data = res.get("data", res)
 
-        if isinstance(data, dict):
-            for k, v in data.items():
-                if k.lower() not in ["status", "success", "key", "code"] and v:
-                    lines.append(f"🔹 *{k.replace('_', ' ').title()}:* `{v}`")
-        elif isinstance(data, list) and len(data) > 0:
-            first = data[0]
-            if isinstance(first, dict):
-                for k, v in first.items():
-                    if v:
-                        lines.append(f"🔹 *{k.replace('_', ' ').title()}:* `{v}`")
-        else:
-            lines.append(f"🔹 *Result:* `{data}`")
+        if isinstance(raw_data, list):
+            records = raw_data
+        elif isinstance(raw_data, dict):
+            if "data" in raw_data and isinstance(raw_data["data"], list):
+                records = raw_data["data"]
+            else:
+                records = [raw_data]
 
-        lines.append(f"\\n💳 *Remaining Credits:* `{u['credits']}`")
+        response_text = (
+            f"╔══════════════════════════╗\n"
+            f"   🔍 <b>NUMBER DETAILS FOUND</b>\n"
+            f"╚══════════════════════════╝\n\n"
+            f"📱 <b>Target Number:</b> <code>{mobile}</code>\n"
+            f"📊 <b>Total Records:</b> <code>{len(records)}</code>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        )
+
+        for i, rec in enumerate(records, 1):
+            name = str(rec.get("name") or "N/A").strip()
+            father = str(rec.get("father_name") or "N/A").strip()
+            address = str(rec.get("address") or "N/A").strip().replace("\n", ", ")
+            alt_phone = str(rec.get("alt_number") or "N/A").strip()
+            circle = str(rec.get("circle") or "N/A").strip()
+
+            response_text += (
+                f"👤 <b>RECORD #{i}</b>\n"
+                f"├ <b>Name:</b> {name}\n"
+                f"├ <b>Father's Name:</b> {father}\n"
+                f"├ <b>Alternate Mobile:</b> <code>{alt_phone}</code>\n"
+                f"├ <b>Circle / Operator:</b> {circle}\n"
+                f"└ <b>Address:</b> <i>{address}</i>\n\n"
+            )
+
+        response_text += (
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"💳 <b>Remaining Credits:</b> <code>{u['credits']}</code>\n"
+            f"<i>Powered by @{ADMIN_USER}</i>"
+        )
 
         bot.delete_message(m.chat.id, load_msg.message_id)
-        bot.send_message(m.chat.id, "\\n".join(lines), parse_mode='Markdown', reply_markup=main_keyboard())
+        bot.send_message(m.chat.id, response_text, parse_mode='HTML', reply_markup=main_keyboard())
 
-    except Exception as e:
-        bot.edit_message_text("❌ API Server offline ya busy hai. Baad me try karein.", chat_id=m.chat.id, message_id=load_msg.message_id)
+    except Exception:
+        bot.edit_message_text("❌ Server busy ya data parse karne me problem aayi. Thodi der baad dubara try karein.", chat_id=m.chat.id, message_id=load_msg.message_id)
 
 if __name__ == '__main__':
     threading.Thread(target=run_web, daemon=True).start()
     bot.infinity_polling(timeout=10, long_polling_timeout=5)
-                    
